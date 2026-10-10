@@ -15,6 +15,14 @@ html[data-contrast=high]{--bg:#000;--paper:#000;--ink:#fff;--green:#fff;--blue:#
 @media(max-width:760px){.shell{width:calc(100% - 1.2rem)}.masthead{padding:1rem 0;align-items:flex-start}.masthead img{width:100px}.event{font-size:.85rem}.hash{font-size:.75rem}.intro{padding:1.3rem 0 1rem}.message{grid-template-columns:1fr}.message figure img{max-height:430px}.copy{padding:1.2rem}.toolbar{position:static}.message{scroll-margin-top:1rem}html{scroll-padding-top:1rem}.tools .label{width:100%}.copy h2{font-size:1.6rem}.audio{margin-top:.25rem}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}@media print{.toolbar,.chapters,.listen-message,.skip{display:none}body{background:white;color:#173b42}.message{break-inside:avoid;border-radius:0}.shell{width:100%}.copy{padding:1rem}.message figure img{max-height:500px}}
 .listen-icon{width:1.25em;height:1.25em;vertical-align:middle;margin-inline-end:.35em;flex:none}#book-audio{width:min(100%,520px);display:block;height:44px;margin-top:.4rem}html[data-contrast="high"] #book-audio{color-scheme:dark}
 </style>
+<!-- Campaign analytics: reports are private to the Analytics property. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-S87Q7LCBE1"></script>
+<script>
+window.dataLayer=window.dataLayer||[];
+function gtag(){window.dataLayer.push(arguments);}
+gtag('js',new Date());
+gtag('config','G-S87Q7LCBE1',{allow_google_signals:false,allow_ad_personalization_signals:false,page_location:location.origin+location.pathname});
+</script>
 </head>
 <body>
 <a class="skip" href="#book-content">انتقل إلى رسائل الكتيب</a>
@@ -52,5 +60,55 @@ $('stop').onclick=()=>end();
 $('pause').onclick=()=>{if(!active)return;if(player.paused){const pending=player.play();if(pending)pending.catch(()=>status('تعذّرت المتابعة. اضغط التشغيل في مشغّل الصوت.'));}else player.pause();};
 $('speed').onchange=()=>{player.playbackRate=Number($('speed').value);};
 window.addEventListener('pagehide',()=>end(false));
+</script>
+<script>
+// Campaign measurement v1: each event once per page view; use Total users in GA4.
+// Completion means >=5 visible seconds for each of the 10 message bodies,
+// not proof of reading or comprehension. Hidden tabs do not accrue time.
+(function(){
+'use strict';
+const sent=new Set();
+function once(name,params){
+ if(sent.has(name))return;
+ sent.add(name);
+ if(typeof window.gtag==='function')window.gtag('event',name,params||{});
+}
+function access(feature){
+ once('accessibility_use');
+ once('accessibility_'+feature);
+}
+const doc=document.documentElement;
+function readingPreferences(){
+ if(doc.dataset.contrast==='high')access('contrast');
+ if(parseFloat(doc.style.getPropertyValue('--size'))>18)access('enlarge');
+}
+['contrast','larger','smaller','reset'].forEach(id=>{
+ document.getElementById(id).addEventListener('click',readingPreferences);
+});
+readingPreferences();
+document.getElementById('book-audio').addEventListener('playing',()=>access('listen'));
+const copies=Array.from(document.querySelectorAll('.message .copy'));
+const elapsed=copies.map(()=>0);
+let last=performance.now();
+const timer=setInterval(()=>{
+ const now=performance.now(),delta=Math.min(1000,Math.max(0,now-last));last=now;
+ if(document.visibilityState!=='visible')return;
+ const toolbar=document.querySelector('.toolbar');
+ const top=toolbar&&getComputedStyle(toolbar).position==='sticky'?Math.max(0,toolbar.getBoundingClientRect().bottom):0;
+ const height=window.innerHeight-top;
+ if(height<=0)return;
+ copies.forEach((copy,i)=>{
+  if(elapsed[i]>=5000)return;
+  const r=copy.getBoundingClientRect();
+  const visible=Math.max(0,Math.min(r.bottom,window.innerHeight)-Math.max(r.top,top));
+  if(r.height>0&&visible>=Math.min(r.height,height)*0.5)elapsed[i]+=delta;
+ });
+ if(copies.length===10&&elapsed.every(ms=>ms>=5000)){
+  once('booklet_complete',{completion_rule:'ten_messages_5s_visible_v1'});
+  clearInterval(timer);
+ }
+},250);
+document.addEventListener('visibilitychange',()=>{last=performance.now();});
+})();
 </script>
 </body></html>
